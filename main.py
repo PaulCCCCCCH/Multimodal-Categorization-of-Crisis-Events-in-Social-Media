@@ -10,7 +10,9 @@ from torch.utils.data import DataLoader
 from torch import nn
 from torch import optim
 
-from transformers import BertTokenizer, BertModel
+from transformers import BertTokenizer
+
+from preprocess import clean_text
 
 from mm_models import DenseNetBertMMModel
 from crisismmd_dataset import CrisisMMDataset
@@ -40,19 +42,23 @@ batch_size = 20
 
 if __name__ == '__main__':
 
-    tokenizer = BertTokenizer.from_pretrained('bert-base-uncased')
+    bert_tokenizer = BertTokenizer.from_pretrained('bert-base-uncased')
+    tokenizer = lambda s: bert_tokenizer(clean_text(s))
 
     train_loader, dev_loader = None, None
     if not EVAL:
-        train_set = CrisisMMDataset(opt, phase='train', cat='all', task='task2', tokenizer=tokenizer)
+        train_set = CrisisMMDataset()
+        train_set.initialze(opt, phase='train', cat='all', task='task2', tokenizer=tokenizer)
         train_loader = DataLoader(
             train_set.data, batch_size=batch_size, shuffle=True, num_workers=num_workers)
 
-    dev_set = CrisisMMDataset(opt, phase='dev', cat='all', task='task2', tokenizer=tokenizer)
+    dev_set = CrisisMMDataset()
+    dev_set.initialize(opt, phase='dev', cat='all', task='task2', tokenizer=tokenizer)
     dev_loader = DataLoader(
         dev_set.data, batch_size=batch_size, shuffle=False, num_workers=num_workers)
 
-    test_set = CrisisMMDataset(opt, phase='test', cat='all', task='task2', tokenizer=tokenizer)
+    test_set = CrisisMMDataset()
+    test_set.initialize(opt, phase='test', cat='all', task='task2', tokenizer=tokenizer)
     test_loader = DataLoader(
         test_set, batch_size=batch_size, shuffle=False, num_workers=num_workers
     )

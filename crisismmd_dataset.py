@@ -44,17 +44,7 @@ labels_task2 = {
 
 class CrisisMMDataset(BaseDataset):
 
-    def initialize(self, opt, phase='train', cat='all', task='task2', tokenizer=None):
-        self.opt = opt
-
-        self.dataset_root = f'{dataroot}/CrisisMMD_v2.0'
-        self.image_root = f'{self.dataset_root}/data_image'
-        self.label_map = labels_task1 if task == 'task1' else labels_task2
-        self.tokenizer = tokenizer
-
-        ann_file = '%s/crisismmd_datasplit_all/task_%s_text_img_%s.tsv' % (
-            self.dataset_root, task_dict[task], phase
-        )
+    def read_data(self, ann_file):
         with open(ann_file, encoding='utf-8') as f:
             self.info = f.readlines()[1:]
 
@@ -66,15 +56,38 @@ class CrisisMMDataset(BaseDataset):
                 '\t')
             self.data_list.append(
                 {
-                    'image': image,
-                    'text_tokens': tokenizer(tweet_text) if self.tokenizer is not None else tweet_text,
+                    'path_image': '%s/%s' % (self.dataset_root, image),
+
                     'text': tweet_text,
-                    'label': label,
-                    'label_image': label_image,
-                    'label_text': label_text,
-                    'label_text_image': label_text_image
+                    'text_tokens': self.tokenizer(tweet_text) if self.tokenizer is not None else tweet_text,
+
+                    'label_str': label,
+                    'label': self.label_map[label],
+
+                    'label_image_str': label_image,
+                    'label_image': self.label_map[label_image],
+
+                    'label_text_str': label_text,
+                    'label_text': self.label_map[label_text]
                 }
             )
+
+
+
+    def initialize(self, opt, phase='train', cat='all', task='task2', tokenizer=None):
+        self.opt = opt
+
+        self.dataset_root = f'{dataroot}/CrisisMMD_v2.0'
+        self.image_root = f'{self.dataset_root}/data_image'
+        self.label_map = labels_task1 if task == 'task1' else labels_task2
+        self.tokenizer = tokenizer
+
+        ann_file = '%s/crisismmd_datasplit_all/task_%s_text_img_%s.tsv' % (
+            self.dataset_root, task_dict[task], phase
+        )
+
+        # Append list of data to self.data_list
+        self.read_data(ann_file)
 
         np.random.default_rng(seed=0).shuffle(self.data_list)
         self.data_list = self.data_list[:self.opt.max_dataset_size]
@@ -96,37 +109,147 @@ class CrisisMMDataset(BaseDataset):
 
     def __getitem__(self, index):
 
-        d = self.data_list[index]
-        path_image = '%s/%s' % (self.dataset_root, d['image'])
-        label_image_str = d['label_image']
-        label_image = self.label_map[label_image_str]
-        tweet_text = d['text']
-        tweet_tokens = d['text_tokens']
-        label_text_str = d['label_text']
-        label_text = self.label_map[label_text_str]
-        image = Image.open(path_image).convert('RGB')
-        image = self.transforms(image)
-        image = np.array([0])
+        data = self.data_list[index]
+        if 'image' not in data:
+            image = Image.open(data['path_image']).convert('RGB')
+            image = self.transforms(image)
+            image = np.array([0])
+            data['image'] = image
 
-        ret = {
-            'image': image,
-            'label_image': label_image,
-            'text': tweet_text,
-            'label_text': label_text,
-            'text_tokens': tweet_tokens,
-            'label_image_str': label_image_str,
-            'label_text_str': label_text_str,
-            'path_image': path_image,
-        }
-
-        return ret
+        return data
 
     def __len__(self):
         return self.N
 
     def name(self):
-        return 'SDFDataset'
+        return 'CrisisMMDataset'
 
+
+
+class CrisisMMDatasetWithSSE(CrisisMMDataset):
+
+    def initialize(self, opt, pv, pt, pv0, pt0, phase='train', cat='all', task='task2', tokenizer=None):
+        super(CrisisMMDatasetWithSSE, self).initialize(opt, phase=phase, cat=cat, task=task, tokenizer=tokenizer)
+        self.pv = pv
+        self.pt = pt
+        self.pv0 = pv0
+        self.pt0 = pt0
+        # Probability of transition to a connected image embedding
+        self.p_img_conn = pv / (1 + pv)
+        # Probability of transition to a connected text embedding
+        self.p_txt_conn = pt / (1 + pt)
+        self.build_trainsition_probs()
+    
+
+    def build_trainsition_probs(self):
+        # Transition probability from one class to another for every class pairs
+        self.transition_probs = {}
+        for class_a in self.class_dict:
+            len_class_a = self.class_lengths[class_a]
+            len_non_class_a = sum(self.class_lengths.values()) - len_class_a
+            transition_prob = []
+            for class_b in self.class_dict:
+                if class_a == class_b:
+                    continue
+                len_class_b = self.class_lengths[class_b]
+                transition_prob.append((class_b, len_class_b / len_non_class_a))
+            self.transition_probs[class_a] = transition_prob
+                
+
+    def read_data(self, ann_file):
+        with open(ann_file, encoding='utf-8') as f:
+            self.info = f.readlines()[1:]
+
+        self.data_list = []
+        self.class_dict = {}
+        self.class_lengths = {}
+
+        for idx, l in enumerate(self.info):
+            l = l.rstrip('\n')
+            event_name, tweet_id, image_id, tweet_text,	image,	label,	label_text,	label_image, label_text_image = l.split(
+                '\t')
+            mapped_label = self.label_map[label]
+            self.data_list.append(
+                {
+                    'path_image': '%s/%s' % (self.dataset_root, image),
+
+                    'text': tweet_text,
+                    'text_tokens': self.tokenizer(tweet_text) if self.tokenizer is not None else tweet_text,
+
+                    'label_str': label,
+                    'label': mapped_label,
+
+                    'label_image_str': label_image,
+                    'label_image': self.label_map[label_image],
+
+                    'label_text_str': label_text,
+                    'label_text': self.label_map[label_text]
+                }
+            )
+
+            if mapped_label in self.class_dict:
+                self.class_dict[mapped_label].append(idx)
+            else:
+                self.class_dict[mapped_label] = []
+        self.class_lengths = {class_idx: len(indices) for class_idx, indices in self.class_dict.items()}
+
+    def should_do(self, p):
+        # Toss a biased coin that gives a head with a probability of p
+        # Returns True if it results in head. 
+        if np.random.random() > p:
+            return False
+        return True
+
+    def transit_same_class(self, curr_class, curr_idx):
+        while True:
+            target_idx = np.random.choice(self.class_dict[curr_class])
+            if target_idx != curr_idx:
+                return self.data_list[target_idx]
+
+    def get_transit_data(self, curr_class, curr_idx):
+        should_keep_same_class = self.should_do(self.p_img_conn)
+        if should_keep_same_class:
+            # Transit to the same class, but not to itself
+            target_data = self.transit_same_class(curr_class, curr_idx)
+        else:
+            # Transit to another class
+            target_class = np.random.choice(self.transition_probs[curr_class], p=[p[1] for p in self.transition_probs[curr_class]])[0]
+            target_data = np.random.choice(self.class_dict[target_class])
+        return target_data
+
+ 
+    def __getitem__(self, index):
+
+        data = self.data_list[index]
+        curr_class = data['label']
+
+        # Make transition on the image side
+        should_transit_image = self.should_do(self.pv0)
+        if should_transit_image:
+            target_data = self.get_transit_data(curr_class, index)
+            data['path_image'] = target_data['path_image']
+
+        # Do the same on the text side
+        should_transit_text = self.should_do(self.pt0)
+        if should_transit_text:
+            target_data = self.get_transit_data(curr_class, index)
+            for attr in ['text', 'text_tokens']:
+                data[attr] = target_data[attr]
+
+        # Open image and assign as before        
+        if 'image' not in data:
+            image = Image.open(data['path_image']).convert('RGB')
+            image = self.transforms(image)
+            image = np.array([0])
+            data['image'] = image
+
+        return data 
+
+    def __len__(self):
+        return self.N
+
+    def name(self):
+        return 'CrisisMMDatasetWithSSE'
 
 if __name__ == '__main__':
 

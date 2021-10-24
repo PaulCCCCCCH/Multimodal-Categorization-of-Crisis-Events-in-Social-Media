@@ -79,7 +79,7 @@ class DenseNetBertMMModel(MMModel):
         joint_repr = torch.cat((masked_v_i, masked_e_i), dim=1) # N, 2*dim_proj
 
         # Get class label prediction logits with final fully-connected layers
-        return self.cls_layer(nn.ReLU(self.fc_as_self_attn(joint_repr)))
+        return self.cls_layer(nn.Dropout(nn.ReLU(self.fc_as_self_attn(joint_repr))))
 
     def save(self, filename):
         state_dict = self.state_dict()

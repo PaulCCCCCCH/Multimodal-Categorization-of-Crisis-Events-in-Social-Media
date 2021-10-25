@@ -2,7 +2,6 @@
     Preprocess reference https://www.kaggle.com/awadhi123/text-preprocessing-using-nltk
 """
 from os import truncate
-import nltk
 from nltk import stem
 # module for stop words that come with NLTK
 from nltk.corpus import stopwords
@@ -13,12 +12,6 @@ import string
 import transformers
 import torch
 
-from transformers import AutoTokenizer
-
-nltk.download('stopwords')
-
-# Tokenizer for bert
-tokenizer = AutoTokenizer.from_pretrained('bert-base-cased') 
 
 def clean_text(raw_text):
     """
@@ -44,7 +37,6 @@ def preprocess_sample_bert(raw_text):
     """
     cleaned = clean_text(raw_text)
     return tokenizer(cleaned, padding='max_length', max_length=40, truncation=True)
-    
 
 
 def preprocess_sample(raw_text, tokenizer, stemmer, remove_stop_words, remove_punctuation, stemming=False):

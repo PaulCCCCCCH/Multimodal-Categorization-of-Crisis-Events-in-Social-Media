@@ -3,6 +3,10 @@ import argparse
 
 def get_args():
     parser = argparse.ArgumentParser()
+
+    # Run mode
+    parser.add_argument('--debug', action='store_true')
+
     parser.add_argument('--gpu', default=0, type=int)
     parser.add_argument('--batch_size', default=1, type=int)
 

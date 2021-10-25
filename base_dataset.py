@@ -13,9 +13,6 @@ class BaseDataset(data.Dataset):
         pass
 
 
-class SSEDataset(BaseDataset):
-
-
 def scale_shortside(img, target_width, crop_width, method=Image.BICUBIC):
     ow, oh = img.size
     shortside = min(ow, oh)

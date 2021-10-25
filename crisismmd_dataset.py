@@ -1,4 +1,5 @@
 import os
+import torch
 import numpy as np
 from imageio import imread
 from PIL import Image
@@ -14,6 +15,9 @@ import torchvision.transforms as transforms
 
 import torchvision.utils as vutils
 from torchvision import datasets
+
+from transformers import BertTokenizer
+from preprocess import clean_text
 
 from base_dataset import BaseDataset
 from base_dataset import scale_shortside
@@ -59,7 +63,7 @@ class CrisisMMDataset(BaseDataset):
                     'path_image': '%s/%s' % (self.dataset_root, image),
 
                     'text': tweet_text,
-                    'text_tokens': self.tokenizer(tweet_text) if self.tokenizer is not None else tweet_text,
+                    'text_tokens': self.tokenize(tweet_text),
 
                     'label_str': label,
                     'label': self.label_map[label],
@@ -72,15 +76,19 @@ class CrisisMMDataset(BaseDataset):
                 }
             )
 
+    def tokenize(self, sentence):
+        ids = self.tokenizer(clean_text(
+            sentence), padding='max_length', max_length=40, truncation=True).items()
+        return {k: torch.tensor(v) for k, v in ids}
 
-
-    def initialize(self, opt, phase='train', cat='all', task='task2', tokenizer=None):
+    def initialize(self, opt, phase='train', cat='all', task='task2'):
         self.opt = opt
 
-        self.dataset_root = f'{dataroot}/CrisisMMD_v2.0'
+        self.dataset_root = f'{dataroot}/CrisisMMD_v2.0_toy' if opt.debug else f'{dataroot}/CrisisMMD_v2.0'
         self.image_root = f'{self.dataset_root}/data_image'
         self.label_map = labels_task1 if task == 'task1' else labels_task2
-        self.tokenizer = tokenizer
+
+        self.tokenizer = BertTokenizer.from_pretrained('bert-base-uncased')
 
         ann_file = '%s/crisismmd_datasplit_all/task_%s_text_img_%s.tsv' % (
             self.dataset_root, task_dict[task], phase
@@ -108,28 +116,26 @@ class CrisisMMDataset(BaseDataset):
         ])
 
     def __getitem__(self, index):
-
         data = self.data_list[index]
         if 'image' not in data:
-            image = Image.open(data['path_image']).convert('RGB')
-            image = self.transforms(image)
-            image = np.array([0])
+            with Image.open(data['path_image']).convert('RGB') as img:
+                image = self.transforms(img)
             data['image'] = image
 
         return data
 
     def __len__(self):
-        return self.N
+        return len(self.data_list)
 
     def name(self):
         return 'CrisisMMDataset'
 
 
-
 class CrisisMMDatasetWithSSE(CrisisMMDataset):
 
-    def initialize(self, opt, pv, pt, pv0, pt0, phase='train', cat='all', task='task2', tokenizer=None):
-        super(CrisisMMDatasetWithSSE, self).initialize(opt, phase=phase, cat=cat, task=task, tokenizer=tokenizer)
+    def initialize(self, opt, pv, pt, pv0, pt0, phase='train', cat='all', task='task2'):
+        super(CrisisMMDatasetWithSSE, self).initialize(
+            opt, phase=phase, cat=cat, task=task)
         self.pv = pv
         self.pt = pt
         self.pv0 = pv0
@@ -139,7 +145,6 @@ class CrisisMMDatasetWithSSE(CrisisMMDataset):
         # Probability of transition to a connected text embedding
         self.p_txt_conn = pt / (1 + pt)
         self.build_trainsition_probs()
-    
 
     def build_trainsition_probs(self):
         # Transition probability from one class to another for every class pairs
@@ -152,9 +157,9 @@ class CrisisMMDatasetWithSSE(CrisisMMDataset):
                 if class_a == class_b:
                     continue
                 len_class_b = self.class_lengths[class_b]
-                transition_prob.append((class_b, len_class_b / len_non_class_a))
+                transition_prob.append(
+                    (class_b, len_class_b / len_non_class_a))
             self.transition_probs[class_a] = transition_prob
-                
 
     def read_data(self, ann_file):
         with open(ann_file, encoding='utf-8') as f:
@@ -174,7 +179,7 @@ class CrisisMMDatasetWithSSE(CrisisMMDataset):
                     'path_image': '%s/%s' % (self.dataset_root, image),
 
                     'text': tweet_text,
-                    'text_tokens': self.tokenizer(tweet_text) if self.tokenizer is not None else tweet_text,
+                    'text_tokens': self.tokenize(tweet_text),
 
                     'label_str': label,
                     'label': mapped_label,
@@ -191,11 +196,12 @@ class CrisisMMDatasetWithSSE(CrisisMMDataset):
                 self.class_dict[mapped_label].append(idx)
             else:
                 self.class_dict[mapped_label] = []
-        self.class_lengths = {class_idx: len(indices) for class_idx, indices in self.class_dict.items()}
+        self.class_lengths = {class_idx: len(
+            indices) for class_idx, indices in self.class_dict.items()}
 
     def should_do(self, p):
         # Toss a biased coin that gives a head with a probability of p
-        # Returns True if it results in head. 
+        # Returns True if it results in head.
         if np.random.random() > p:
             return False
         return True
@@ -213,11 +219,11 @@ class CrisisMMDatasetWithSSE(CrisisMMDataset):
             target_data = self.transit_same_class(curr_class, curr_idx)
         else:
             # Transit to another class
-            target_class = np.random.choice(self.transition_probs[curr_class], p=[p[1] for p in self.transition_probs[curr_class]])[0]
+            target_class = np.random.choice(self.transition_probs[curr_class], p=[
+                                            p[1] for p in self.transition_probs[curr_class]])[0]
             target_data = np.random.choice(self.class_dict[target_class])
         return target_data
 
- 
     def __getitem__(self, index):
 
         data = self.data_list[index]
@@ -236,20 +242,21 @@ class CrisisMMDatasetWithSSE(CrisisMMDataset):
             for attr in ['text', 'text_tokens']:
                 data[attr] = target_data[attr]
 
-        # Open image and assign as before        
+        # Open image and assign as before
+        data = self.data_list[index]
         if 'image' not in data:
-            image = Image.open(data['path_image']).convert('RGB')
-            image = self.transforms(image)
-            image = np.array([0])
+            with Image.open(data['path_image']).convert('RGB') as img:
+                image = self.transforms(img)
             data['image'] = image
 
-        return data 
+        return data
 
     def __len__(self):
-        return self.N
+        return len(self.data_list)
 
     def name(self):
         return 'CrisisMMDatasetWithSSE'
+
 
 if __name__ == '__main__':
 

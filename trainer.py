@@ -10,10 +10,7 @@ import sys
 
 
 class Trainer:
-    def __init__(self, train_loader, dev_loader, test_loader, model: nn.Module, loss_fn, optimizer, scheduler, save_dir='.', display=500, eval=False, device='cuda', tensorboard=False):
-        # No longer supports cpu training
-        if device == 'cpu':
-            raise NotImplemented
+    def __init__(self, train_loader, dev_loader, test_loader, model: nn.Module, loss_fn, optimizer, scheduler, save_dir='.', display=100, eval=False, device='cuda', tensorboard=False):
 
         self.model = model
         self.loss_fn = loss_fn
@@ -37,7 +34,8 @@ class Trainer:
             self.writer = SummaryWriter()
 
     def train(self, max_iter):
-        self.scaler = torch.cuda.amp.GradScaler()
+        if self.device != 'cpu':
+            self.scaler = torch.cuda.amp.GradScaler()
 
         for idx_iter in range(max_iter):
             print("Training iteration {}".format(idx_iter))
@@ -49,25 +47,38 @@ class Trainer:
             display_total_loss = 0
             batch = 0
             for data in tqdm(self.train_loader, total=len(self.train_loader)):
+            # for data in self.train_loader:
                 self.model.train()
                 self.model.zero_grad()
 
-                x = (data['image'].to(self.device), data['text_tokens'].to(self.device))
+                x = (data['image'].to(self.device),
+                     {k: v.to(self.device) for k, v in data['text_tokens'].items()})
                 y = data['label_text'].to(self.device)
 
                 # For mixed-precision training
-                with torch.cuda.amp.autocast():
+                if self.device != 'cpu':
+                    with torch.cuda.amp.autocast():
+                        logits = self.model(x)
+                        loss = self.loss_fn(logits, y)
+
+                    total_loss += loss.item()
+
+                    self.scaler.scale(loss).backward()
+                    self.scaler.step(self.optimizer)
+                    self.scaler.update()
+
+                    display_total_loss += loss.item()
+                else:
+
                     logits = self.model(x)
                     loss = self.loss_fn(logits, y)
 
+                    total_loss += loss.item()
 
-                total_loss += loss.item()
+                    loss.backward()
+                    self.optimizer.step()
 
-                self.scaler.scale(loss).backward()
-                self.scaler.step(self.optimizer)
-                self.scaler.update()
-
-                display_total_loss += loss.item()
+                    display_total_loss += loss.item()
 
                 indices = torch.argmax(logits, dim=1)
                 batch_correct = sum(indices == y).item()
@@ -75,8 +86,8 @@ class Trainer:
                 correct += batch_correct
                 display_correct += batch_correct
 
-                total += x.shape[0]
-                display_total += x.shape[0]
+                total += x[0].shape[0]
+                display_total += x[0].shape[0]
 
                 batch += 1
                 if batch % self.display == 0:
@@ -105,6 +116,8 @@ class Trainer:
             self.model.save('checkpoint_{}'.format(idx_iter))
             print("done")
             print("Calculating validation loss...")
+            del x # save some memory here before validating
+            del y
             dev_loss = self.validate(idx_iter)
             self.scheduler.step(dev_loss)
             print("======================================\n".format(idx_iter))
@@ -117,10 +130,11 @@ class Trainer:
         total = 0
         total_loss = 0
 
-        for x, y in self.dev_loader:
+        for data in self.dev_loader:
 
-            x = x.to(self.device)
-            y = y.to(self.device)
+            x = (data['image'].to(self.device),
+                 {k: v.to(self.device) for k, v in data['text_tokens'].items()})
+            y = data['label_text'].to(self.device)
 
             logits = self.model(x)
             loss = self.loss_fn(logits, y)
@@ -128,7 +142,7 @@ class Trainer:
 
             indices = torch.argmax(logits, dim=1)
             correct += sum(indices == y).item()
-            total += x.shape[0]
+            total += x[0].shape[0]
 
         dev_acc = correct / total
         dev_loss = total_loss / total
@@ -139,13 +153,15 @@ class Trainer:
             self.writer.add_scalar('Dev Acc', dev_acc, idx_iter)
         return dev_loss
 
-
     def predict(self):
         self.model.eval()
         predictions = []
 
-        for x, _ in self.test_loader:
-            x = x.to(self.device)
+        for data in self.test_loader:
+
+            x = (data['image'].to(self.device),
+                 {k: v.to(self.device) for k, v in data['text_tokens'].items()})
+
             logits = self.model(x)
 
             # indices is a tensor of predictions

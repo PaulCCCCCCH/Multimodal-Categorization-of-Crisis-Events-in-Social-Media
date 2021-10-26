@@ -1,6 +1,6 @@
 # CVPR 2020: Multimodal Categorization of Crisis Events in Social Media
 
-This is an unofficial implementation for the CVPR 2020 paper *Multimodal Categorization of Crisis Events in Social Media*.
+This is an unofficial implementation for the CVPR 2020 paper [*Multimodal Categorization of Crisis Events in Social Media*](https://openaccess.thecvf.com/content_CVPR_2020/papers/Abavisani_Multimodal_Categorization_of_Crisis_Events_in_Social_Media_CVPR_2020_paper.pdf).
 
 > Abavisani, Mahdi, et al. "Multimodal categorization of crisis events in social media." Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition. 2020.
 

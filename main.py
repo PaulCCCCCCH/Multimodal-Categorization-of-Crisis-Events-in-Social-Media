@@ -38,7 +38,7 @@ if __name__ == '__main__':
 
     # The authors did not report the following values, but they tried
     # pv, pt in [10, 20000], and pv0, pt0 in [0, 1]
-    WITH_SSE = False
+    WITH_SSE = True
     pv = 1000
     pt = 1000
     pv0 = 0.5
@@ -55,11 +55,11 @@ if __name__ == '__main__':
         if WITH_SSE:
             train_set = CrisisMMDatasetWithSSE()
             train_set.initialize(opt, pv, pt, pv0, pt0, phase='train', cat='all',
-                                task=TASK)
+                                 task=TASK)
         else:
             train_set = CrisisMMDataset()
             train_set.initialize(opt, phase='train', cat='all',
-                                task=TASK)
+                                 task=TASK)
         train_loader = DataLoader(
             train_set, batch_size=batch_size, shuffle=True, num_workers=num_workers)
 

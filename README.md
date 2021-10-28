@@ -48,4 +48,5 @@ The authors did not give the size of the DenseNet they used.
 - T1: Check SSE implementation
 - T1: Put configurations 
 - T2: More reasonable model saving (priority queue, save n best)
+- T2: Setting `num_workers > 1` deadlocks the dataloader.
 - T3: Better logging

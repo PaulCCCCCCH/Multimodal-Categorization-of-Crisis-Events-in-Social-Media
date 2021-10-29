@@ -165,7 +165,9 @@ class CrisisMMDatasetWithSSE(CrisisMMDataset):
         with open(ann_file, encoding='utf-8') as f:
             self.info = f.readlines()[1:]
 
+        # self.data_list stores samples
         self.data_list = []
+        # self.class_dict stores {label: [sample_idx]}
         self.class_dict = {}
         self.class_lengths = {}
 
@@ -219,13 +221,14 @@ class CrisisMMDatasetWithSSE(CrisisMMDataset):
             target_data = self.transit_same_class(curr_class, curr_idx)
         else:
             # Transit to another class
-            target_class = np.random.choice(self.transition_probs[curr_class], p=[
-                                            p[1] for p in self.transition_probs[curr_class]])[0]
-            target_data = np.random.choice(self.class_dict[target_class])
+            rand_idx = np.random.choice(len(self.transition_probs[curr_class]), p=[
+                p[1] for p in self.transition_probs[curr_class]])
+            target_class = self.transition_probs[curr_class][rand_idx][0]
+            target_data_idx = np.random.choice(self.class_dict[target_class])
+            target_data = self.data_list[target_data_idx]
         return target_data
 
     def __getitem__(self, index):
-
         data = self.data_list[index]
         curr_class = data['label']
 

@@ -47,7 +47,7 @@ class Trainer:
             display_total_loss = 0
             batch = 0
             for data in tqdm(self.train_loader, total=len(self.train_loader)):
-            # for data in self.train_loader:
+                # for data in self.train_loader:
                 self.model.train()
                 self.model.zero_grad()
 
@@ -116,7 +116,7 @@ class Trainer:
             self.model.save('checkpoint_{}'.format(idx_iter))
             print("done")
             print("Calculating validation loss...")
-            del x # save some memory here before validating
+            del x  # save some memory here before validating
             del y
             dev_loss = self.validate(idx_iter)
             self.scheduler.step(dev_loss)
@@ -167,4 +167,8 @@ class Trainer:
             # indices is a tensor of predictions
             indices = torch.argmax(logits, dim=1).to(dtype=torch.int32)
             predictions.extend([pred.item() for pred in indices])
+            with open('prediction.csv', 'w') as f:
+                for pred in predictions:
+                    f.write("{}\n".format(str(pred)))
+
         return predictions

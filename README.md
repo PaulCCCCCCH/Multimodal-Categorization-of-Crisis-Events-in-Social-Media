@@ -37,7 +37,7 @@ The authors stated that $$\alpha_{v_i}$$ was completely dependent on $$e_i$$, an
 After obtaining a multimodal representation that incorporates both visual and textual information, the authors used fully-connected layers to perform classification. Here the authors wrote 
 
 > We add self-attention in the fully-connected networks. 
- 
+
  We assumed that they meant 'we added a fully-connected layer as self-attention'.
 
 ### DenseNet
@@ -48,4 +48,39 @@ The authors did not give the size of the DenseNet they used.
 - T1: Check SSE implementation
 - T1: Put configurations 
 - T2: More reasonable model saving (priority queue, save n best)
+- T2: Setting `num_workers > 1` deadlocks the dataloader.
 - T3: Better logging
+
+
+
+
+
+## Experiments 
+
+### Task 1
+
+|      | Arch V / L          | pv, pv0   | pt, pt0   | Train acc | Dev acc |      |      |
+| ---- | ------------------- | --------- | --------- | --------- | ------- | ---- | ---- |
+|      | DenseNet 201 / Bert | No SSE    | No SSE    | ~83       | 90+     |      |      |
+|      | DenseNet 201 / Bert | 1000, 0.5 | 1000, 0.5 | ~68       | 90 +    |      |      |
+|      | DenseNet 201 / Bert | 1000, 0.3 | 0.7       | ~83       | 90+     |      |      |
+|      | DenseNet 201 / Bert | 1000, 0.5 | 0.98      | ~83       | 90+     |      |      |
+|      |                     |           |           |           |         |      |      |
+|      |                     |           |           |           |         |      |      |
+|      |                     |           |           |           |         |      |      |
+|      |                     |           |           |           |         |      |      |
+|      |                     |           |           |           |         |      |      |
+
+### Task 2
+
+|      | Arch V / L          | pv, pv0   | pt, pt0   | Train acc | Dev acc |      |      |
+| ---- | ------------------- | --------- | --------- | --------- | ------- | ---- | ---- |
+|      | DenseNet 201 / Bert | No SSE    | No SSE    | TODO      | TODO    |      |      |
+|      | DenseNet 201 / Bert | 1000, 0.3 | 1000, 0.7 | ~68       | 90 +    |      |      |
+|      |                     |           |           |           |         |      |      |
+|      |                     |           |           |           |         |      |      |
+|      |                     |           |           |           |         |      |      |
+|      |                     |           |           |           |         |      |      |
+|      |                     |           |           |           |         |      |      |
+|      |                     |           |           |           |         |      |      |
+|      |                     |           |           |           |         |      |      |

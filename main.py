@@ -26,10 +26,10 @@ if __name__ == '__main__':
     device = 'cuda'
     num_workers = 0
 
-    EVAL = False
+    EVAL = True
     USE_TENSORBOARD = False
 
-    TASK = 'task1'
+    TASK = 'task2'
     MAX_ITER = 300
     OUTPUT_SIZE = 2 if TASK == 'task1' else 8
     DIM_VISUAL_REPR = 1000
@@ -39,14 +39,14 @@ if __name__ == '__main__':
     # The authors did not report the following values, but they tried
     # pv, pt in [10, 20000], and pv0, pt0 in [0, 1]
     WITH_SSE = False
-    pv = 1000
+    pv = 1000  # How many times more likely do we transit to the same class
     pt = 1000
-    pv0 = 0.5
-    pt0 = 0.5
+    pv0 = 0.3  # Probability of not doing a transition
+    pt0 = 0.7
 
     # General hyper parameters
     learning_rate = 2e-3
-    batch_size = 8
+    batch_size = 5
 
     # Tokenizer for bert
 
@@ -55,41 +55,31 @@ if __name__ == '__main__':
         if WITH_SSE:
             train_set = CrisisMMDatasetWithSSE()
             train_set.initialize(opt, pv, pt, pv0, pt0, phase='train', cat='all',
-                                task=TASK)
+                                 task=TASK,)
         else:
             train_set = CrisisMMDataset()
             train_set.initialize(opt, phase='train', cat='all',
-                                task=TASK)
+                                 task=TASK)
         train_loader = DataLoader(
             train_set, batch_size=batch_size, shuffle=True, num_workers=num_workers)
 
-    if WITH_SSE:
-        dev_set = CrisisMMDatasetWithSSE()
-        dev_set.initialize(opt, pv, pt, pv0, pt0, phase='dev', cat='all',
-                           task=TASK)
-    else:
-        dev_set = CrisisMMDataset()
-        dev_set.initialize(opt, phase='dev', cat='all',
-                           task=TASK)
+    dev_set = CrisisMMDataset()
+    dev_set.initialize(opt, phase='dev', cat='all',
+                       task=TASK)
 
     dev_loader = DataLoader(
         dev_set, batch_size=batch_size, shuffle=False, num_workers=num_workers)
 
-    if WITH_SSE:
-        test_set = CrisisMMDatasetWithSSE()
-        test_set.initialize(opt, pv, pt, pv0, pt0, phase='test', cat='all',
-                            task=TASK)
-    else:
-        test_set = CrisisMMDataset()
-        test_set.initialize(opt, phase='test', cat='all',
-                            task=TASK)
+    test_set = CrisisMMDataset()
+    test_set.initialize(opt, phase='test', cat='all',
+                        task=TASK)
 
     test_loader = DataLoader(
         test_set, batch_size=batch_size, shuffle=False, num_workers=num_workers
     )
 
     loss_fn = nn.CrossEntropyLoss()
-    model = DenseNetBertMMModel().to(device)
+    model = DenseNetBertMMModel(num_class=OUTPUT_SIZE).to(device)
 
     # The authors did not mention configurations of SGD. We assume they did not use momentum or weight decay.
     optimizer = optim.SGD(model.parameters(), lr=learning_rate)
@@ -124,3 +114,4 @@ if __name__ == '__main__':
         print(trainer.model)
 
         trainer.validate()
+        trainer.predict()

@@ -55,7 +55,7 @@ if __name__ == '__main__':
         if WITH_SSE:
             train_set = CrisisMMDatasetWithSSE()
             train_set.initialize(opt, pv, pt, pv0, pt0, phase='train', cat='all',
-                                 task=TASK,)
+                                 task=TASK)
         else:
             train_set = CrisisMMDataset()
             train_set.initialize(opt, phase='train', cat='all',

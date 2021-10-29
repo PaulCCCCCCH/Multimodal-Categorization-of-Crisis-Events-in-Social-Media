@@ -1,2 +1,2 @@
-dataroot = 'W:/datasets'
-# dataroot = './datasets'
+# dataroot = 'W:/datasets'
+dataroot = './datasets'

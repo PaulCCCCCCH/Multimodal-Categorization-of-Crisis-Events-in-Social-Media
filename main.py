@@ -5,7 +5,7 @@
 from args import get_args
 from trainer import Trainer
 from crisismmd_dataset import CrisisMMDataset, CrisisMMDatasetWithSSE
-from mm_models import DenseNetBertMMModel
+from mm_models import DenseNetBertMMModel, ImageOnlyModel, TextOnlyModel
 import os
 import numpy as np
 import torch
@@ -26,9 +26,10 @@ if __name__ == '__main__':
     device = 'cuda'
     num_workers = 0
 
-    EVAL = True
+    EVAL = False
     USE_TENSORBOARD = False
 
+    MODE = 'image_only'  # choose from ["image_only", "text_only", "both"]
     TASK = 'task2'
     MAX_ITER = 300
     OUTPUT_SIZE = 2 if TASK == 'task1' else 8
@@ -46,7 +47,7 @@ if __name__ == '__main__':
 
     # General hyper parameters
     learning_rate = 2e-3
-    batch_size = 5
+    batch_size = 20
 
     # Tokenizer for bert
 
@@ -79,7 +80,14 @@ if __name__ == '__main__':
     )
 
     loss_fn = nn.CrossEntropyLoss()
-    model = DenseNetBertMMModel(num_class=OUTPUT_SIZE).to(device)
+    if MODE == 'text_only':
+        model = TextOnlyModel(num_class=OUTPUT_SIZE).to(device)
+    elif MODE == 'image_only':
+        model = ImageOnlyModel(num_class=OUTPUT_SIZE).to(device)
+    elif MODE == 'both':
+        model = DenseNetBertMMModel(num_class=OUTPUT_SIZE).to(device)
+    else:
+        raise NotImplemented
 
     # The authors did not mention configurations of SGD. We assume they did not use momentum or weight decay.
     optimizer = optim.SGD(model.parameters(), lr=learning_rate)

@@ -5,7 +5,21 @@ import os
 import torch.nn.functional as F
 
 
-class MMModel(nn.Module):
+class BaseModel(nn.Module):
+    def __init__(self, save_dir='.'):
+        super(BaseModel, self).__init__()
+        self.save_dir = save_dir
+
+    def save(self, filename):
+        state_dict = self.state_dict()
+        torch.save(state_dict, os.path.join(self.save_dir, filename + '.pt'))
+
+    def load(self, filepath):
+        state_dict = torch.load(filepath)
+        self.load_state_dict(state_dict)
+
+
+class MMModel(BaseModel):
     def __init__(self, imageEncoder, textEncoder):
         super(MMModel, self).__init__()
         self.imageEncoder = imageEncoder
@@ -13,6 +27,42 @@ class MMModel(nn.Module):
 
     def forward(self, x):
         raise NotImplemented
+
+
+class TextOnlyModel(BaseModel):
+    def __init__(self, dim_text_repr=768, num_class=2, save_dir='.'):
+        super(TextOnlyModel, self).__init__()
+        config = BertConfig()
+
+        self.textEncoder = BertModel(
+            config).from_pretrained('bert-base-uncased')
+
+        self.linear = nn.Linear(dim_text_repr, num_class)
+
+    def forward(self, x):
+        _, text = x
+
+        hidden_states = self.textEncoder(**text)  # N, T, dim_text_repr
+        e_i = F.dropout(hidden_states[1])  # N, dim_text_repr
+
+        return self.linear(e_i)
+
+
+class ImageOnlyModel(BaseModel):
+    def __init__(self, dim_visual_repr=1000, num_class=2, save_dir='.'):
+        super(ImageOnlyModel, self).__init__()
+
+        self.imageEncoder = torch.hub.load(
+            'pytorch/vision:v0.8.0', 'densenet201', pretrained=True)
+        self.flatten_vis = nn.Flatten()
+        self.linear = nn.Linear(dim_visual_repr, num_class)
+
+    def forward(self, x):
+        image, _ = x
+
+        f_i = F.dropout(self.flatten_vis(self.imageEncoder(image)))
+
+        return self.linear(f_i)
 
 
 class DenseNetBertMMModel(MMModel):
@@ -27,7 +77,8 @@ class DenseNetBertMMModel(MMModel):
         # imageEncoder = torch.hub.load(
         #     'pytorch/vision:v0.8.0', 'densenet121', pretrained=True)
         # imageEncoder = torch.hub.load('pytorch/vision:v0.8.0', 'densenet169', pretrained=True)
-        imageEncoder = torch.hub.load('pytorch/vision:v0.8.0', 'densenet201', pretrained=True)
+        imageEncoder = torch.hub.load(
+            'pytorch/vision:v0.8.0', 'densenet201', pretrained=True)
         # imageEncoder= torch.hub.load('pytorch/vision:v0.8.0', 'densenet161', pretrained=True)
 
         # Bert model: https://huggingface.co/transformers/model_doc/auto.html
@@ -63,7 +114,8 @@ class DenseNetBertMMModel(MMModel):
         image, text = x
 
         # Getting feature map (eqn. 1)
-        f_i = F.dropout(self.flatten_vis(self.imageEncoder(image)))  # N, dim_visual_repr
+        # N, dim_visual_repr
+        f_i = F.dropout(self.flatten_vis(self.imageEncoder(image)))
 
         # Getting sentence representation (eqn. 2)
         hidden_states = self.textEncoder(**text)  # N, T, dim_text_repr
@@ -71,8 +123,10 @@ class DenseNetBertMMModel(MMModel):
         e_i = F.dropout(hidden_states[1])  # N, dim_text_repr
 
         # Getting linear projections (eqn. 3)
-        f_i_tilde = F.relu(self.proj_visual_bn(self.proj_visual(f_i)))  # N, dim_proj
-        e_i_tilde = F.relu(self.proj_text_bn(self.proj_text(e_i)))  # N, dim_proj
+        f_i_tilde = F.relu(self.proj_visual_bn(
+            self.proj_visual(f_i)))  # N, dim_proj
+        e_i_tilde = F.relu(self.proj_text_bn(
+            self.proj_text(e_i)))  # N, dim_proj
 
         # Getting attention masks
         # The authors seemed to have made a mistake in eqn. 4: they said alpha_v_i is
@@ -90,11 +144,3 @@ class DenseNetBertMMModel(MMModel):
 
         # Get class label prediction logits with final fully-connected layers
         return self.cls_layer(F.dropout(F.relu(self.self_attn_bn(self.fc_as_self_attn(joint_repr)))))
-
-    def save(self, filename):
-        state_dict = self.state_dict()
-        torch.save(state_dict, os.path.join(self.save_dir, filename + '.pt'))
-
-    def load(self, filepath):
-        state_dict = torch.load(filepath)
-        self.load_state_dict(state_dict)

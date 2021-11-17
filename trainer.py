@@ -5,12 +5,13 @@ from torch._C import dtype
 from torch.utils.tensorboard import SummaryWriter
 from tqdm import tqdm
 from sklearn.metrics import roc_auc_score
+import logging
 import numpy as np
 import sys
 
 
 class Trainer:
-    def __init__(self, train_loader, dev_loader, test_loader, model: nn.Module, loss_fn, optimizer, scheduler, save_dir='.', display=100, eval=False, device='cuda', tensorboard=False):
+    def __init__(self, train_loader, dev_loader, test_loader, model: nn.Module, loss_fn, optimizer, scheduler, save_dir='.', display=100, eval=False, device='cuda', tensorboard=False, mode='both'):
 
         self.model = model
         self.loss_fn = loss_fn
@@ -29,6 +30,12 @@ class Trainer:
         self.device = device
 
         self.tensorboard = tensorboard
+        if mode == 'both':
+            self.label_key = 'label'
+        elif mode == 'image_only':
+            self.label_key = 'label_image'
+        elif mode =='text_only':
+            self.label_key = 'label_text'
 
         if not eval and tensorboard:
             self.writer = SummaryWriter()
@@ -37,8 +44,10 @@ class Trainer:
         if self.device != 'cpu':
             self.scaler = torch.cuda.amp.GradScaler()
 
+        best_dev_loss = float('inf')
+
         for idx_iter in range(max_iter):
-            print("Training iteration {}".format(idx_iter))
+            logging.info("Training iteration {}".format(idx_iter))
             correct = 0
             display_correct = 0
             total = 0
@@ -53,7 +62,7 @@ class Trainer:
 
                 x = (data['image'].to(self.device),
                      {k: v.to(self.device) for k, v in data['text_tokens'].items()})
-                y = data['label_text'].to(self.device)
+                y = data[self.label_key].to(self.device)
 
                 # For mixed-precision training
                 if self.device != 'cpu':
@@ -93,9 +102,9 @@ class Trainer:
                 if batch % self.display == 0:
                     display_loss = display_total_loss / display_total
                     display_acc = display_correct / display_total
-                    # print("Correct: {}".format(display_correct))
-                    # print("Total: {}".format(display_total))
-                    print("Finished {} / {} batches with loss: {}, accuracy {}"
+                    # logging.info("Correct: {}".format(display_correct))
+                    # logging.info("Total: {}".format(display_total))
+                    logging.info("Finished {} / {} batches with loss: {}, accuracy {}"
                           .format(batch, len(self.train_loader), display_loss, display_acc))
                     total_batch = idx_iter * len(self.train_loader) + batch
 
@@ -109,18 +118,22 @@ class Trainer:
                     display_total = 0
                     display_total_loss = 0
 
-            print("=============Iteration {}=============".format(idx_iter))
-            print("Training accuracy {}".format(correct / total))
-            print("Avg Training loss {}".format(total_loss / total))
-            print("Saving model...", end='')
+            logging.info("=============Iteration {}=============".format(idx_iter))
+            logging.info("Training accuracy {}".format(correct / total))
+            logging.info("Avg Training loss {}".format(total_loss / total))
+            logging.info("Saving model...")
             self.model.save('checkpoint_{}'.format(idx_iter))
-            print("done")
-            print("Calculating validation loss...")
+            logging.info("done")
+            logging.info("Calculating validation loss...")
             del x  # save some memory here before validating
             del y
             dev_loss = self.validate(idx_iter)
+            if dev_loss < best_dev_loss:
+                self.model.save('best')
+                best_dev_loss = dev_loss
+
             self.scheduler.step(dev_loss)
-            print("======================================\n".format(idx_iter))
+            logging.info("======================================\n".format(idx_iter))
 
         self.predict()
 
@@ -134,7 +147,7 @@ class Trainer:
 
             x = (data['image'].to(self.device),
                  {k: v.to(self.device) for k, v in data['text_tokens'].items()})
-            y = data['label_text'].to(self.device)
+            y = data[self.label_key].to(self.device)
 
             logits = self.model(x)
             loss = self.loss_fn(logits, y)
@@ -146,8 +159,8 @@ class Trainer:
 
         dev_acc = correct / total
         dev_loss = total_loss / total
-        print("Dev set accuracy {}".format(dev_acc))
-        print("Dev set loss {}".format(dev_loss))
+        logging.info("Dev set accuracy {}".format(dev_acc))
+        logging.info("Dev set loss {}".format(dev_loss))
         if not self.eval and self.tensorboard:
             self.writer.add_scalar('Dev Loss', dev_loss, idx_iter)
             self.writer.add_scalar('Dev Acc', dev_acc, idx_iter)
@@ -156,19 +169,25 @@ class Trainer:
     def predict(self):
         self.model.eval()
         predictions = []
-
+        correct = 0
+        total = 0
         for data in self.test_loader:
 
             x = (data['image'].to(self.device),
                  {k: v.to(self.device) for k, v in data['text_tokens'].items()})
+            y = data[self.label_key].to(self.device)
 
             logits = self.model(x)
 
             # indices is a tensor of predictions
             indices = torch.argmax(logits, dim=1).to(dtype=torch.int32)
+            correct += sum(indices == y).item()
+
+            total += x[0].shape[0]
             predictions.extend([pred.item() for pred in indices])
             with open('prediction.csv', 'w') as f:
                 for pred in predictions:
                     f.write("{}\n".format(str(pred)))
+        logging.info("Test set accuracy: {}".format(correct / total))
 
         return predictions

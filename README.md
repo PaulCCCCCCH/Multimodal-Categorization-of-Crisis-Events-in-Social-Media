@@ -73,14 +73,14 @@ The authors did not give the size of the DenseNet they used.
 
 ### Task 2
 
-|      | Arch V / L          | pv, pv0    | pt, pt0    | Dev acc | Train acc |      |      |
-| ---- | ------------------- | ---------- | ---------- | ------- | --------- | ---- | ---- |
-|      | DenseNet 201 / Bert | No SSE     | No SSE     | 69      | 90+       |      |      |
-|      | DenseNet 201 / Bert | 1000, 0.3  | 1000, 0.7  | ~68     | 90+       |      |      |
-|      | DenseNet 201 / Bert | 1000, 0.99 | 1000, 0.99 | ~69     | 90+       |      |      |
-|      | DenseNet 101 / Bert | No SSE     | No SSE     |         |           |      |      |
-|      |                     |            |            |         |           |      |      |
-|      |                     |            |            |         |           |      |      |
-|      |                     |            |            |         |           |      |      |
-|      |                     |            |            |         |           |      |      |
-|      |                     |            |            |         |           |      |      |
+|      | Arch V / L                                   | pv, pv0    | pt, pt0    | Dev acc | Train acc |      |      |
+| ---- | -------------------------------------------- | ---------- | ---------- | ------- | --------- | ---- | ---- |
+|      | DenseNet 201 / Bert                          | No SSE     | No SSE     | 69      | 90+       |      |      |
+|      | DenseNet 201 / Bert                          | 1000, 0.3  | 1000, 0.7  | ~68     | 90+       |      |      |
+|      | DenseNet 201 / Bert                          | 1000, 0.99 | 1000, 0.99 | ~69     | 90+       |      |      |
+|      | DenseNet 101 / Bert                          | No SSE     | No SSE     | ~70     | 90+       |      |      |
+|      | DenseNet 201 / Bert + fine-tuned on unimodal | No SSE     | No SSE     | ~70     | 90+       |      |      |
+|      |                                              |            |            |         |           |      |      |
+|      |                                              |            |            |         |           |      |      |
+|      |                                              |            |            |         |           |      |      |
+|      |                                              |            |            |         |           |      |      |

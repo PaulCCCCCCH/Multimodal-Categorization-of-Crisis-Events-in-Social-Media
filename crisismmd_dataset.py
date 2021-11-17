@@ -81,8 +81,9 @@ class CrisisMMDataset(BaseDataset):
             sentence), padding='max_length', max_length=40, truncation=True).items()
         return {k: torch.tensor(v) for k, v in ids}
 
-    def initialize(self, opt, phase='train', cat='all', task='task2'):
+    def initialize(self, opt, phase='train', cat='all', task='task2', shuffle=False):
         self.opt = opt
+        self.shuffle = shuffle
 
         self.dataset_root = f'{dataroot}/CrisisMMD_v2.0_toy' if opt.debug else f'{dataroot}/CrisisMMD_v2.0'
         self.image_root = f'{self.dataset_root}/data_image'
@@ -97,7 +98,8 @@ class CrisisMMDataset(BaseDataset):
         # Append list of data to self.data_list
         self.read_data(ann_file)
 
-        np.random.default_rng(seed=0).shuffle(self.data_list)
+        if self.shuffle:
+            np.random.default_rng(seed=0).shuffle(self.data_list)
         self.data_list = self.data_list[:self.opt.max_dataset_size]
         cprint('[*] %d samples loaded.' % (len(self.data_list)), 'yellow')
 
@@ -110,6 +112,7 @@ class CrisisMMDataset(BaseDataset):
             # transforms.Lambda(lambda img: __scale_shortside(img, opt.load_size, opt.crop_size, Image.BICUBIC)),
             transforms.Lambda(lambda img: scale_shortside(
                 img, opt.load_size, opt.crop_size, Image.BICUBIC)),
+            # transforms.Resize((opt.crop_size, opt.crop_size)),
             transforms.RandomCrop(opt.crop_size),
             transforms.ToTensor(),
             transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5)),

@@ -6,7 +6,7 @@ import torch.nn.functional as F
 
 
 class BaseModel(nn.Module):
-    def __init__(self, save_dir='.'):
+    def __init__(self, save_dir):
         super(BaseModel, self).__init__()
         self.save_dir = save_dir
 
@@ -16,12 +16,12 @@ class BaseModel(nn.Module):
 
     def load(self, filepath):
         state_dict = torch.load(filepath)
-        self.load_state_dict(state_dict)
+        self.load_state_dict(state_dict, strict=False)
 
 
 class MMModel(BaseModel):
-    def __init__(self, imageEncoder, textEncoder):
-        super(MMModel, self).__init__()
+    def __init__(self, imageEncoder, textEncoder, save_dir):
+        super(MMModel, self).__init__(save_dir=save_dir)
         self.imageEncoder = imageEncoder
         self.textEncoder = textEncoder
 
@@ -30,8 +30,8 @@ class MMModel(BaseModel):
 
 
 class TextOnlyModel(BaseModel):
-    def __init__(self, dim_text_repr=768, num_class=2, save_dir='.'):
-        super(TextOnlyModel, self).__init__()
+    def __init__(self, save_dir, dim_text_repr=768, num_class=2):
+        super(TextOnlyModel, self).__init__(save_dir)
         config = BertConfig()
 
         self.textEncoder = BertModel(
@@ -49,8 +49,8 @@ class TextOnlyModel(BaseModel):
 
 
 class ImageOnlyModel(BaseModel):
-    def __init__(self, dim_visual_repr=1000, num_class=2, save_dir='.'):
-        super(ImageOnlyModel, self).__init__()
+    def __init__(self, save_dir, dim_visual_repr=1000, num_class=2):
+        super(ImageOnlyModel, self).__init__(save_dir=save_dir)
 
         self.imageEncoder = torch.hub.load(
             'pytorch/vision:v0.8.0', 'densenet201', pretrained=True)
@@ -66,7 +66,7 @@ class ImageOnlyModel(BaseModel):
 
 
 class DenseNetBertMMModel(MMModel):
-    def __init__(self, dim_visual_repr=1000, dim_text_repr=768, dim_proj=100, num_class=2, save_dir='.'):
+    def __init__(self, save_dir, dim_visual_repr=1000, dim_text_repr=768, dim_proj=100, num_class=2):
         self.save_dir = save_dir
 
         self.dim_visual_repr = dim_visual_repr
@@ -85,7 +85,7 @@ class DenseNetBertMMModel(MMModel):
         config = BertConfig()
         textEncoder = BertModel(config).from_pretrained('bert-base-uncased')
 
-        super(DenseNetBertMMModel, self).__init__(imageEncoder, textEncoder)
+        super(DenseNetBertMMModel, self).__init__(imageEncoder, textEncoder, save_dir)
 
         # Flatten image features to 1D array
         self.flatten_vis = torch.nn.Flatten()

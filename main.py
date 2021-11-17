@@ -1,7 +1,11 @@
 """
 @author: Chonghan Chen <chonghac@cs.cmu.edu>
 """
-
+from os import path as osp
+import os
+import logging
+from PIL.Image import SAVE
+from torch.serialization import save
 from args import get_args
 from trainer import Trainer
 from crisismmd_dataset import CrisisMMDataset, CrisisMMDatasetWithSSE
@@ -13,6 +17,7 @@ from torch.nn.modules import activation
 from torch.utils.data import DataLoader
 from torch import nn
 from torch import optim
+import time
 
 import nltk
 nltk.download('stopwords')
@@ -21,35 +26,46 @@ nltk.download('stopwords')
 if __name__ == '__main__':
     opt = get_args()
 
-    model_to_load = None
+    model_to_load = opt.model_to_load
+    image_model_to_load = opt.image_model_to_load
+    text_model_to_load = opt.text_model_to_load
 
-    device = 'cuda'
-    num_workers = 0
+    device = opt.device
+    num_workers = opt.num_workers
 
-    EVAL = False
-    USE_TENSORBOARD = False
+    EVAL = opt.eval
+    USE_TENSORBOARD = opt.use_tensorboard
+    SAVE_DIR = opt.save_dir
+    MODEL_NAME = opt.model_name if opt.model_name else str(int(time.time()))
 
-    MODE = 'image_only'  # choose from ["image_only", "text_only", "both"]
-    TASK = 'task2'
-    MAX_ITER = 300
+    MODE = opt.mode
+    TASK = opt.task
+    MAX_ITER = opt.max_iter
     OUTPUT_SIZE = 2 if TASK == 'task1' else 8
-    DIM_VISUAL_REPR = 1000
-    DIM_TEXT_REPR = 756
-    DIM_PROJ = 756
 
     # The authors did not report the following values, but they tried
     # pv, pt in [10, 20000], and pv0, pt0 in [0, 1]
-    WITH_SSE = False
-    pv = 1000  # How many times more likely do we transit to the same class
-    pt = 1000
-    pv0 = 0.3  # Probability of not doing a transition
-    pt0 = 0.7
+    WITH_SSE = opt.with_sse
+    pv = opt.pv # How many times more likely do we transit to the same class
+    pt = opt.pt 
+    pv0 = opt.pv0  # Probability of not doing a transition
+    pt0 = opt.pt0
 
     # General hyper parameters
-    learning_rate = 2e-3
-    batch_size = 20
+    learning_rate = opt.learning_rate
+    batch_size = opt.batch_size
 
-    # Tokenizer for bert
+    # Create folder for saving
+    save_dir = osp.join(SAVE_DIR, MODEL_NAME)
+    if not osp.exists(SAVE_DIR):
+        os.mkdir(SAVE_DIR)
+    if not osp.exists(save_dir):
+        os.mkdir(save_dir)
+
+
+    # set logger
+    logging.basicConfig(filename=osp.join(save_dir, 'output_{}.log'.format(int(time.time()))), level=logging.INFO)
+
 
     train_loader, dev_loader = None, None
     if not EVAL:
@@ -81,11 +97,11 @@ if __name__ == '__main__':
 
     loss_fn = nn.CrossEntropyLoss()
     if MODE == 'text_only':
-        model = TextOnlyModel(num_class=OUTPUT_SIZE).to(device)
+        model = TextOnlyModel(num_class=OUTPUT_SIZE, save_dir=save_dir).to(device)
     elif MODE == 'image_only':
-        model = ImageOnlyModel(num_class=OUTPUT_SIZE).to(device)
+        model = ImageOnlyModel(num_class=OUTPUT_SIZE, save_dir=save_dir).to(device)
     elif MODE == 'both':
-        model = DenseNetBertMMModel(num_class=OUTPUT_SIZE).to(device)
+        model = DenseNetBertMMModel(num_class=OUTPUT_SIZE, save_dir=save_dir).to(device)
     else:
         raise NotImplemented
 
@@ -97,29 +113,31 @@ if __name__ == '__main__':
         optimizer, factor=0.1, patience=5, cooldown=0, verbose=True)
 
     trainer = Trainer(train_loader, dev_loader, test_loader,
-                      model, loss_fn, optimizer, scheduler, eval=EVAL, device=device, tensorboard=USE_TENSORBOARD)
+                      model, loss_fn, optimizer, scheduler, eval=EVAL, device=device, tensorboard=USE_TENSORBOARD, mode=MODE)
 
     if model_to_load:
         model.load(model_to_load)
-        print("\n***********************")
-        print("Model Loaded!")
-        print("***********************\n")
-    else:
-        print("No previous model loaded. Training new model!")
+        logging.info("\n***********************")
+        logging.info("Model Loaded!")
+        logging.info("***********************\n")
+    if text_model_to_load:
+        model.load(text_model_to_load)
+    if image_model_to_load:
+        model.load(image_model_to_load)
 
     if not EVAL:
-        print("\n================Training Summary=================")
-        print("Training Summary: ")
-        print("Learning rate {}".format(learning_rate))
-        print("Batch size {}".format(batch_size))
-        print(trainer.model)
-        print("\n=================================================")
+        logging.info("\n================Training Summary=================")
+        logging.info("Training Summary: ")
+        logging.info("Learning rate {}".format(learning_rate))
+        logging.info("Batch size {}".format(batch_size))
+        logging.info(trainer.model)
+        logging.info("\n=================================================")
 
         trainer.train(MAX_ITER)
 
     else:
-        print("\n================Evaluating Model=================")
-        print(trainer.model)
+        logging.info("\n================Evaluating Model=================")
+        logging.info(trainer.model)
 
         trainer.validate()
         trainer.predict()

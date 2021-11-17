@@ -27,6 +27,7 @@ from paths import dataroot
 task_dict = {
     'task1': 'informative',
     'task2': 'humanitarian',
+    'task2_merged': 'humanitarian',
 }
 
 labels_task1 = {
@@ -35,15 +36,27 @@ labels_task1 = {
 }
 
 labels_task2 = {
-    'affected_individuals': 0,
-    'infrastructure_and_utility_damage': 1,
-    'injured_or_dead_people': 2,
-    'missing_or_found_people': 3,
-    'not_humanitarian': 4,
-    'other_relevant_information': 5,
-    'rescue_volunteering_or_donation_effort': 6,
-    'vehicle_damage': 7,
+    'infrastructure_and_utility_damage': 0,
+    'not_humanitarian': 1,
+    'other_relevant_information': 2,
+    'rescue_volunteering_or_donation_effort': 3,
+    'vehicle_damage': 4,
+    'affected_individuals': 5,
+    'injured_or_dead_people': 6,
+    'missing_or_found_people': 7,
 }
+
+labels_task2_merged = {
+    'infrastructure_and_utility_damage': 0,
+    'not_humanitarian': 1,
+    'other_relevant_information': 2,
+    'rescue_volunteering_or_donation_effort': 3,
+    'vehicle_damage': 4,
+    'affected_individuals': 5,
+    'injured_or_dead_people': 5,
+    'missing_or_found_people': 5,
+}
+
 
 
 class CrisisMMDataset(BaseDataset):
@@ -87,7 +100,13 @@ class CrisisMMDataset(BaseDataset):
 
         self.dataset_root = f'{dataroot}/CrisisMMD_v2.0_toy' if opt.debug else f'{dataroot}/CrisisMMD_v2.0'
         self.image_root = f'{self.dataset_root}/data_image'
-        self.label_map = labels_task1 if task == 'task1' else labels_task2
+        self.label_map = None
+        if task == 'task1':
+            self.label_map = labels_task1
+        elif task == 'task2':
+            self.label_map = labels_task2
+        elif task == 'task2_merged':
+            self.label_map = labels_task2_merged
 
         self.tokenizer = BertTokenizer.from_pretrained('bert-base-uncased')
 

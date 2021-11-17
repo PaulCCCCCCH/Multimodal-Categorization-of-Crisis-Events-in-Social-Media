@@ -7,13 +7,13 @@ def get_args():
 
     # -------------- Important configs --------------- #
     parser.add_argument('--mode', choices=['both', 'image_only', 'text_only'])
-    parser.add_argument('--task', choices=['task1', 'task2'])
+    parser.add_argument('--task', choices=['task1', 'task2', 'task2_merged'])
     parser.add_argument('--learning_rate', default=2e-4, type=float)
     parser.add_argument('--batch_size', default=64, type=int)
-    parser.add_argument('--with_sse', action='store_true')
     parser.add_argument('--save_dir', default='./output', type=str)
     parser.add_argument('--model_name', default='', type=str)
 
+    parser.add_argument('--with_sse', action='store_true')
 
     # only used when with_sse set
     parser.add_argument('--pv', default=1000, type=int)

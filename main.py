@@ -41,7 +41,15 @@ if __name__ == '__main__':
     MODE = opt.mode
     TASK = opt.task
     MAX_ITER = opt.max_iter
-    OUTPUT_SIZE = 2 if TASK == 'task1' else 8
+    OUTPUT_SIZE = None 
+    if TASK == 'task1':
+        OUTPUT_SIZE = 2
+    elif TASK == 'task2':
+        OUTPUT_SIZE = 8
+    elif TASK == 'task2_merged':
+        OUTPUT_SIZE = 6
+    else:
+        raise NotImplemented
 
     # The authors did not report the following values, but they tried
     # pv, pt in [10, 20000], and pv0, pt0 in [0, 1]

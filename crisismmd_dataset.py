@@ -20,7 +20,7 @@ from transformers import BertTokenizer
 from preprocess import clean_text
 
 from base_dataset import BaseDataset
-from base_dataset import scale_shortside
+from base_dataset import expand2square
 
 from paths import dataroot
 
@@ -129,10 +129,11 @@ class CrisisMMDataset(BaseDataset):
 
         self.transforms = transforms.Compose([
             # transforms.Lambda(lambda img: __scale_shortside(img, opt.load_size, opt.crop_size, Image.BICUBIC)),
-            transforms.Lambda(lambda img: scale_shortside(
-                img, opt.load_size, opt.crop_size, Image.BICUBIC)),
-            # transforms.Resize((opt.crop_size, opt.crop_size)),
-            transforms.RandomCrop(opt.crop_size),
+            # transforms.Lambda(lambda img: scale_shortside(
+            #     img, opt.load_size, opt.crop_size, Image.BICUBIC)),
+            transforms.Lambda(lambda img: expand2square(img)),
+            transforms.Resize((opt.crop_size, opt.crop_size)),
+            # transforms.RandomCrop(opt.crop_size),
             transforms.ToTensor(),
             transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5)),
         ])

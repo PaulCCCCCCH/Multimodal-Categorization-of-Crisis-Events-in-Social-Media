@@ -1,7 +1,7 @@
 DEVICE="cuda:7"
 BATCH_SIZE="32"
 ENTRY='main.py'
-MAX_ITER=50
+MAX_ITER=40
 
 for TASK in task1 task2_merged
 do

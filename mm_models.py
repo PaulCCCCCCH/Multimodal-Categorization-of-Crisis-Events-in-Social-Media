@@ -1,5 +1,6 @@
 import torch
 import torch.nn as nn
+from torch.nn.modules.dropout import Dropout
 from transformers import BertModel, BertConfig
 import os
 import torch.nn.functional as F
@@ -33,6 +34,7 @@ class TextOnlyModel(BaseModel):
     def __init__(self, save_dir, dim_text_repr=768, num_class=2):
         super(TextOnlyModel, self).__init__(save_dir)
         config = BertConfig()
+        self.dropout = nn.Dropout()
 
         self.textEncoder = BertModel(
             config).from_pretrained('bert-base-uncased')
@@ -43,7 +45,7 @@ class TextOnlyModel(BaseModel):
         _, text = x
 
         hidden_states = self.textEncoder(**text)  # N, T, dim_text_repr
-        e_i = F.dropout(hidden_states[1])  # N, dim_text_repr
+        e_i = self.dropout(hidden_states[1])  # N, dim_text_repr
 
         return self.linear(e_i)
 
@@ -56,11 +58,12 @@ class ImageOnlyModel(BaseModel):
             'pytorch/vision:v0.8.0', 'densenet201', pretrained=True)
         self.flatten_vis = nn.Flatten()
         self.linear = nn.Linear(dim_visual_repr, num_class)
+        self.dropout = nn.Dropout()
 
     def forward(self, x):
         image, _ = x
 
-        f_i = F.dropout(self.flatten_vis(self.imageEncoder(image)))
+        f_i = self.dropout(self.flatten_vis(self.imageEncoder(image)))
 
         return self.linear(f_i)
 
@@ -71,6 +74,7 @@ class DenseNetBertMMModel(MMModel):
 
         self.dim_visual_repr = dim_visual_repr
         self.dim_text_repr = dim_text_repr
+        self.dropout = Dropout()
 
         # DenseNet: https://pytorch.org/hub/pytorch_vision_densenet/
         # The authors did not mention which one they used.
@@ -115,12 +119,12 @@ class DenseNetBertMMModel(MMModel):
 
         # Getting feature map (eqn. 1)
         # N, dim_visual_repr
-        f_i = F.dropout(self.flatten_vis(self.imageEncoder(image)))
+        f_i = self.dropout(self.flatten_vis(self.imageEncoder(image)))
 
         # Getting sentence representation (eqn. 2)
         hidden_states = self.textEncoder(**text)  # N, T, dim_text_repr
         # The authors used embedding associated with [CLS] to represent the whole sentence
-        e_i = F.dropout(hidden_states[1])  # N, dim_text_repr
+        e_i = self.dropout(hidden_states[1])  # N, dim_text_repr
 
         # Getting linear projections (eqn. 3)
         f_i_tilde = F.relu(self.proj_visual_bn(
@@ -143,4 +147,4 @@ class DenseNetBertMMModel(MMModel):
                                dim=1)  # N, 2*dim_proj
 
         # Get class label prediction logits with final fully-connected layers
-        return self.cls_layer(F.dropout(F.relu(self.self_attn_bn(self.fc_as_self_attn(joint_repr)))))
+        return self.cls_layer(self.dropout(F.relu(self.self_attn_bn(self.fc_as_self_attn(joint_repr)))))

@@ -132,9 +132,14 @@ class CrisisMMDataset(BaseDataset):
             # transforms.Lambda(lambda img: scale_shortside(
             #     img, opt.load_size, opt.crop_size, Image.BICUBIC)),
             transforms.Lambda(lambda img: expand2square(img)),
-            transforms.Resize((opt.crop_size, opt.crop_size)),
-            # transforms.RandomCrop(opt.crop_size),
+            transforms.Resize((opt.load_size, opt.load_size)),
+            transforms.RandomHorizontalFlip(0.2),
+            transforms.RandomGrayscale(0.1),
+            transforms.RandomAffine(20),
+            transforms.RandomCrop((opt.crop_size, opt.crop_size)),
             transforms.ToTensor(),
+            transforms.ColorJitter(
+                brightness=0.01, contrast=0.01, saturation=0.01, hue=0.01),
             transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5)),
         ])
 

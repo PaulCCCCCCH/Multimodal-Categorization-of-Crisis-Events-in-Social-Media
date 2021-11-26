@@ -74,7 +74,6 @@ class DenseNetBertMMModel(MMModel):
 
         self.dim_visual_repr = dim_visual_repr
         self.dim_text_repr = dim_text_repr
-        self.dropout = Dropout()
 
         # DenseNet: https://pytorch.org/hub/pytorch_vision_densenet/
         # The authors did not mention which one they used.
@@ -90,6 +89,7 @@ class DenseNetBertMMModel(MMModel):
         textEncoder = BertModel(config).from_pretrained('bert-base-uncased')
 
         super(DenseNetBertMMModel, self).__init__(imageEncoder, textEncoder, save_dir)
+        self.dropout = Dropout()
 
         # Flatten image features to 1D array
         self.flatten_vis = torch.nn.Flatten()

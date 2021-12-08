@@ -71,6 +71,10 @@ class CrisisMMDataset(BaseDataset):
             l = l.rstrip('\n')
             event_name, tweet_id, image_id, tweet_text,	image,	label,	label_text,	label_image, label_text_image = l.split(
                 '\t')
+
+            if self.consistent_only and label_text != label_image:
+                continue
+
             self.data_list.append(
                 {
                     'path_image': '%s/%s' % (self.dataset_root, image),
@@ -94,10 +98,10 @@ class CrisisMMDataset(BaseDataset):
             sentence), padding='max_length', max_length=40, truncation=True).items()
         return {k: torch.tensor(v) for k, v in ids}
 
-    def initialize(self, opt, phase='train', cat='all', task='task2', shuffle=False):
+    def initialize(self, opt, phase='train', cat='all', task='task2', shuffle=False, consistent_only=False):
         self.opt = opt
         self.shuffle = shuffle
-
+        self.consistent_only = consistent_only
         self.dataset_root = f'{dataroot}/CrisisMMD_v2.0_toy' if opt.debug else f'{dataroot}/CrisisMMD_v2.0'
         self.image_root = f'{self.dataset_root}/data_image'
         self.label_map = None
@@ -134,23 +138,22 @@ class CrisisMMDataset(BaseDataset):
             transforms.Lambda(lambda img: expand2square(img)),
             transforms.Resize((opt.load_size, opt.load_size)),
             transforms.RandomHorizontalFlip(0.2),
-            transforms.RandomGrayscale(0.1),
-            transforms.RandomAffine(20),
             transforms.RandomCrop((opt.crop_size, opt.crop_size)),
             transforms.ToTensor(),
-            transforms.ColorJitter(
-                brightness=0.01, contrast=0.01, saturation=0.01, hue=0.01),
             transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5)),
         ])
 
     def __getitem__(self, index):
         data = self.data_list[index]
-        if 'image' not in data:
-            with Image.open(data['path_image']).convert('RGB') as img:
-                image = self.transforms(img)
-            data['image'] = image
 
-        return data
+        to_return = {}
+        for k, v in data.items():
+            to_return[k] = v
+
+        with Image.open(data['path_image']).convert('RGB') as img:
+            image = self.transforms(img)
+        to_return['image'] = image
+        return to_return
 
     def __len__(self):
         return len(self.data_list)
@@ -161,9 +164,9 @@ class CrisisMMDataset(BaseDataset):
 
 class CrisisMMDatasetWithSSE(CrisisMMDataset):
 
-    def initialize(self, opt, pv, pt, pv0, pt0, phase='train', cat='all', task='task2'):
+    def initialize(self, opt, pv, pt, pv0, pt0, phase='train', cat='all', task='task2', consistent_only=False):
         super(CrisisMMDatasetWithSSE, self).initialize(
-            opt, phase=phase, cat=cat, task=task)
+            opt, phase=phase, cat=cat, task=task, consistent_only=consistent_only)
         self.pv = pv
         self.pt = pt
         self.pv0 = pv0
@@ -203,6 +206,10 @@ class CrisisMMDatasetWithSSE(CrisisMMDataset):
             l = l.rstrip('\n')
             event_name, tweet_id, image_id, tweet_text,	image,	label,	label_text,	label_image, label_text_image = l.split(
                 '\t')
+
+            if self.consistent_only and label_text != label_image:
+                continue
+
             mapped_label = self.label_map[label]
             self.data_list.append(
                 {
@@ -275,12 +282,14 @@ class CrisisMMDatasetWithSSE(CrisisMMDataset):
 
         # Open image and assign as before
         data = self.data_list[index]
-        if 'image' not in data:
-            with Image.open(data['path_image']).convert('RGB') as img:
-                image = self.transforms(img)
-            data['image'] = image
+        to_return = {}
+        for k, v in data.items():
+            to_return[k] = v
 
-        return data
+        with Image.open(data['path_image']).convert('RGB') as img:
+            image = self.transforms(img)
+        to_return['image'] = image
+        return to_return
 
     def __len__(self):
         return len(self.data_list)
